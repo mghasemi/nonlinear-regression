@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.linear_model import Ridge
+from sklearn.linear_model import LinearRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import FunctionTransformer
 
 
 def f(x):
-    return x * np.sin(x) - np.sqrt(x) * np.cos(2 * x)
+    return x * np.sin(x) - np.sqrt(x) * np.cos(2 * x) + x ** 2
 
 
 # Fourier base generator
@@ -20,6 +20,8 @@ def fourier(X, n=1, l=1.):
             else:
                 point.append(np.sin(deg * x[0] / l))
                 point.append(np.cos(deg * x[0] / l))
+        point.append(x[0])
+        point.append(x[0] ** 2)
         points.append(np.array(point))
     return np.array(points)
 
@@ -86,7 +88,7 @@ x_plot = np.linspace(0, 10, 100)
 x = np.linspace(0, 10, 100)
 rng = np.random.RandomState(0)
 rng.shuffle(x)
-x = np.sort(x[:20])
+x = np.sort(x[:10])
 y = f(x)
 # create matrix versions of these arrays
 X = x[:, np.newaxis]
@@ -97,14 +99,14 @@ plt.plot(x_plot, f(x_plot), color='cornflowerblue', linewidth=lw, label="ground 
 plt.scatter(x, y, color='navy', s=30, marker='o', label="training points")
 
 for count, degree in enumerate([7, 8, 9, 10]):
-    model = make_pipeline(FunctionTransformer(fourier, kw_args=dict(n=degree, l=3), validate=False), Ridge())
+    model = make_pipeline(FunctionTransformer(fourier, kw_args=dict(n=degree, l=3), validate=False), LinearRegression())
     model.fit(X, y)
     y_plot = model.predict(X_plot)
     plt.plot(x_plot, y_plot, color=colors[count], linewidth=lw, label="degree %d" % degree)
-plt.legend(loc='lower left')
+plt.legend(loc=2)
 
 print(fourier([[-1]], n=3))
 B = Fourier(1, 3)
 print([_([-1.]) for _ in B])
 
-# plt.show()
+plt.show()
