@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import BayesianRidge
@@ -37,8 +36,8 @@ def mixed(X, p_d=3, f_d=1, l=1., e_d=2):
         for deg in range(1, p_d + 1):
             point.append(x[0] ** deg)
         for deg in range(e_d + 1):
-            point.append((x[0] ** deg) * np.exp(x[0]))
-            point.append((x[0] ** deg) * np.exp(-x[0]))
+            point.append((x[0] ** deg) * np.exp(-x[0] / l))
+            point.append((x[0] ** deg) * np.exp(x[0] / (2.5 * l)))
         points.append(np.array(point))
     return np.array(points)
 
@@ -52,9 +51,13 @@ def aggregate(df, method='monthly'):
     clmns = list(df.columns)
     clmns.pop(clmns.index('date'))
     idx = 0.
-    stp = .1
     while cur_date < max_date:
-        if method == 'monthly':
+        nxt_date = cur_date
+        if method == 'daily':
+            nxt_date = cur_date + timedelta(days=1)
+            stp = .01
+        elif method == 'monthly':
+            stp = .1
             nxt_date = cur_date + timedelta(days=31)
             nxt_date = nxt_date - timedelta(days=(nxt_date.day - 1))
         t_df = df[(df['date'] >= cur_date) & (df['date'] < nxt_date)].mean()
@@ -68,49 +71,171 @@ def aggregate(df, method='monthly'):
     return new_df
 
 
-df = pd.read_csv("../data/RemandCnt.csv", parse_dates=['date'])
-
-def plot_population(df, center='Regina', yrs=2):
-    c_df = aggregate(df)
+def plot_population(df, center='Regina', yrs=2, start=5., method='daily'):
+    import matplotlib.pyplot as plt
+    from random import randint
+    plt.figure(randint(1, 1000))
+    ell = 20
+    time_span = 1.2
+    if method == 'daily':
+        time_span = 3.56
+        ell = 20
+    elif method == 'monthly':
+        time_span = 1.2
+        ell = 4
+    c_df = aggregate(df, method=method)
     x = c_df['t'].values
-    y_s = c_df['SEN_%s'%center].values
-    y_r = c_df['REM_%s'%center].values
+    y_s = c_df['SEN_%s' % center].values
+    y_r = c_df['REM_%s' % center].values
     x_t = x.reshape(-1, 1)
-    y_ts = y_s.reshape(-1, 1)
-    y_tr = y_r.reshape(-1, 1)
-    x_f = np.linspace(10., max(x)+yrs*1.2, 200)
-    model1 = GenericRegressor(mixed, regressor=BayesianRidge, **dict(p_d=2, f_d=2, l=3., e_d=0))
+    y_ts = y_s  # .reshape(-1, 1)
+    y_tr = y_r  # .reshape(-1, 1)
+    x_f = np.linspace(start, max(x) + yrs * time_span, 200)
+    model1 = GenericRegressor(mixed, regressor=BayesianRidge, **dict(p_d=1, f_d=50, l=ell, e_d=0))
     model1.fit(x_t, y_ts)
-    plt.scatter(x, y_ts, color='navy', s=5, marker='o', label="Sentenced actual counts")
+    plt.scatter(x, y_ts, color='black', s=1, marker='o', alpha=0.2)  # , label="Sentenced actual counts")
     y_ps = model1.predict(x_f.reshape(-1, 1))
-    plt.plot(x_f, y_ps, color='salmon', linewidth=1, label="Sentenced")
+    plt.plot(x_f, y_ps, color='lightgreen', linewidth=1, label="Sentenced")
     plt.fill_between(x_f,
-                         y_ps - model1.ci_band,
-                         y_ps + model1.ci_band,
-                         color='salmon',
-                         alpha=0.1)
-    model2 = GenericRegressor(mixed, regressor=BayesianRidge, **dict(p_d=2, f_d=2, l=3., e_d=0))
+                     y_ps - model1.ci_band,
+                     y_ps + model1.ci_band,
+                     color='lightgreen',
+                     alpha=0.1)
+    model2 = GenericRegressor(mixed, regressor=BayesianRidge, **dict(p_d=1, f_d=30, l=5, e_d=0))
     model2.fit(x_t, y_tr)
-    plt.scatter(x, y_tr, color='navy', s=5, marker='o', label="Remand  actual counts")
+    plt.scatter(x, y_tr, color='black', s=1, marker='o', alpha=0.2)  # , label="Remand  actual counts")
     y_pr = model2.predict(x_f.reshape(-1, 1))
-    plt.plot(x_f, y_pr, color='Green', linewidth=1, label="Remand")
+    plt.plot(x_f, y_pr, color='blue', linewidth=1, label="Remand")
     plt.fill_between(x_f,
-                         y_pr - model2.ci_band,
-                         y_pr + model2.ci_band,
-                         color='green',
-                         alpha=0.1)
-    model3 = GenericRegressor(mixed, regressor=BayesianRidge, **dict(p_d=2, f_d=2, l=3., e_d=0))
-    model3.fit(x_t, (y_tr + y_ts))
-    plt.scatter(x, (y_tr + y_ts), color='navy', s=5, marker='o', label="Total custody counts")
-    y_prs = model3.predict(x_f.reshape(-1, 1))
-    plt.plot(x_f, y_prs, color='Green', linewidth=1, label="Total")
+                     y_pr - model2.ci_band,
+                     y_pr + model2.ci_band,
+                     color='blue',
+                     alpha=0.1)
+    # model3 = GenericRegressor(mixed, regressor=BayesianRidge, **dict(p_d=2, f_d=2, l=3., e_d=0))
+    # model3.fit(x_t, (y_tr + y_ts))
+    plt.scatter(x, (y_tr + y_ts), color='black', s=1, marker='o', alpha=0.2)  # , label="Total custody counts")
+    # y_prs = model3.predict(x_f.reshape(-1, 1))
+    plt.plot(x_f, y_pr + y_ps, color='red', linewidth=1, label="Total")
     plt.fill_between(x_f,
-                         y_prs - model3.ci_band,
-                         y_prs + model3.ci_band,
-                         color='orange',
-                         alpha=0.1)
-
+                     y_pr + y_ps - (model1.ci_band + model2.ci_band) / 2.,
+                     y_pr + y_ps + (model1.ci_band + model2.ci_band) / 2.,
+                     color='red',
+                     alpha=0.1)
+    plt.title(center)
     plt.legend(loc=2)
+    plt.grid(True, linestyle='-.', alpha=.2)
+    plt.savefig(center + '.png', dpi=200)
+    # plt.show()
+
+
+def prophet(df, center='Regina', yrs=2):
+    import matplotlib.pyplot as plt
+    from fbprophet import Prophet
+    from random import randint
+    fig = plt.figure(randint(1, 1000))
+    df1 = df[['date', 'REM_%s' % center]]
+    df2 = df[['date', 'SEN_%s' % center]]
+    df1.rename(columns={'date': 'ds', 'REM_%s' % center: 'y'}, inplace=True)
+    df2.rename(columns={'date': 'ds', 'SEN_%s' % center: 'y'}, inplace=True)
+    m1 = Prophet()
+    m1.fit(df1)
+    m2 = Prophet()
+    m2.fit(df2)
+    future1 = m1.make_future_dataframe(periods=yrs * 365)
+    future2 = m2.make_future_dataframe(periods=yrs * 365)
+    forecast1 = m1.predict(future1)
+    forecast2 = m2.predict(future2)
+    y1 = df1['y'].values
+    y1_hat = forecast1['yhat'].values
+    y1_l = forecast1['yhat_lower'].values
+    y1_u = forecast1['yhat_upper'].values
+    plt.scatter(range(y1.shape[0]), y1, color='black', s=1, marker='o', alpha=0.1)
+    plt.plot(y1_hat, color='blue', linewidth=1, label='Remand')
+    plt.fill_between(range(y1_hat.shape[0]), y1_l, y1_u, color='blue', alpha=0.1)
+    y2 = df2['y'].values
+    y2_hat = forecast2['yhat'].values
+    y2_l = forecast2['yhat_lower'].values
+    y2_u = forecast2['yhat_upper'].values
+    plt.scatter(range(y2.shape[0]), y2, color='black', s=1, marker='o', alpha=0.1)
+    plt.plot(y2_hat, color='lightgreen', linewidth=1, label='Sentenced')
+    plt.fill_between(range(y2_hat.shape[0]), y2_l, y2_u, color='lightgreen', alpha=0.1)
+    plt.scatter(range(y2.shape[0]), (y1 + y2), color='black', s=1, marker='o', alpha=.1)
+    # y_prs = model3.predict(x_f.reshape(-1, 1))
+    plt.plot(y1_hat + y2_hat, color='red', linewidth=1, label="Total")
+    plt.fill_between(range(y2_hat.shape[0]),
+                     (y1_l + y2_l),
+                     (y1_u + y2_u),
+                     color='red',
+                     alpha=0.1)
+    plt.title(center)
+    plt.legend(loc=2)
+    plt.grid(True, linestyle='-.', alpha=.2)
+    plt.savefig(center + '_fb.png', dpi=200)
+    # plt.show()
+
+
+def holt_winters(df, center='Regina', yrs=5, start=5., method='daily'):
+    import matplotlib.pyplot as plt
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing
+    from random import randint
+    plt.figure(randint(1, 1000))
+    method = 'monthly'
+    c_df = aggregate(df, method=method).set_index('date')
+    last_date = max(c_df.index)
+    c_df.index.freq = 'MS'
+    train1 = c_df[['REM_%s' % center]]
+    train2 = c_df[['SEN_%s' % center]]
+    test = pd.date_range(start=last_date, periods=yrs * 12, freq='MS')
+    model1 = ExponentialSmoothing(train1, trend='add', seasonal='mul', seasonal_periods=12, damped=False)
+    model2 = ExponentialSmoothing(train2, trend='add', seasonal='mul', seasonal_periods=12, damped=False)
+    hw_model1 = model1.fit(optimized=True, use_boxcox=False, remove_bias=False)
+    hw_model2 = model2.fit(optimized=True, use_boxcox=False, remove_bias=False)
+    pred1 = hw_model1.predict(start=last_date, end=test[-1])
+    pred2 = hw_model2.predict(start=last_date, end=test[-1])
+    plt.plot(train1.index, train1, label='Remand')
+    plt.plot(test, pred1.values, label='Remand projection')
+    plt.plot(train2.index, train2, label='Sentenced')
+    plt.plot(test, pred2.values, label='Sentenced projection')
+    plt.legend(loc='best')
+    plt.title(center)
+    plt.grid(True, linestyle='-.', alpha=.2)
+    plt.savefig(center + '_hw.png', dpi=200)
     plt.show()
 
-plot_population(df)
+
+def arima(df, center='Regina', yrs=5, start=5., method='daily'):
+    import matplotlib.pyplot as plt
+    from statsmodels.tsa.statespace import sarimax
+    from random import randint
+    plt.figure(randint(1, 1000))
+    method = 'monthly'
+    c_df = aggregate(df, method=method).set_index('date')
+    last_date = max(c_df.index)
+    c_df.index.freq = 'MS'
+    train1 = c_df[['REM_%s' % center]]
+    train2 = c_df[['SEN_%s' % center]]
+    test = pd.date_range(start=last_date, periods=yrs * 12, freq='MS')
+    model1 = sarimax.SARIMAX(train1)#, order=(2, 1, 4), seasonal_order=(0, 1, 1, 7))
+    model2 = sarimax.SARIMAX(train2)#, order=(2, 1, 4), seasonal_order=(0, 1, 1, 7))
+    hw_model1 = model1.fit(optimized=True, use_boxcox=False, remove_bias=False)
+    hw_model2 = model2.fit(optimized=True, use_boxcox=False, remove_bias=False)
+    pred1 = hw_model1.predict(start=last_date, end=test[-1])
+    pred2 = hw_model2.predict(start=last_date, end=test[-1])
+    plt.plot(train1.index, train1, label='Remand')
+    plt.plot(test, pred1.values, label='Remand projection')
+    plt.plot(train2.index, train2, label='Sentenced')
+    plt.plot(test, pred2.values, label='Sentenced projection')
+    plt.legend(loc='best')
+    plt.show()
+
+
+df = pd.read_csv("../data/RemandCnt.csv", parse_dates=['date'])
+yrs = 5
+centers = ['Regina', 'Saskatoon', 'PrinceAlbert', 'PineGrove']
+for cntr in centers:
+    holt_winters(df, center=cntr, start=0., yrs=yrs, method='monthly')
+# prophet(df, center=cntr, yrs=yrs)
+
+# plot_population(df)
+# prophet(df, yrs=5)
+# arima(df)

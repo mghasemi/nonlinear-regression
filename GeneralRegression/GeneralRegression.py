@@ -9,7 +9,7 @@ class GenericRegressor(BaseEstimator, RegressorMixin):
         # to store the standard deviations of the predicted values
         self.std = False
         # convert the confidence interval value to find the ppf
-        self.ci = (1 + ci) / 2.
+        self.ci = ci  # (1 + ci) / 2.
         self.standard_deviation = []
         if regressor is None:
             self.regressor = LinearRegression
@@ -43,7 +43,7 @@ class GenericRegressor(BaseEstimator, RegressorMixin):
             from scipy.stats import norm
             pred, std = self.model.predict(X, return_std=True)
             z_bar = norm.ppf(self.ci, 0, 1)
-            self.ci_band = z_bar * std / sqrt(max(self.size - 1 , 1))
+            self.ci_band = z_bar * std  # / sqrt(max(self.size - 1 , 1))
         else:
             pred = self.model.predict(X)
             std = None
@@ -52,9 +52,7 @@ class GenericRegressor(BaseEstimator, RegressorMixin):
 
 
 ###########################################################
-import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.linear_model import BayesianRidge
 
 
 def f(x):
@@ -76,6 +74,8 @@ def fourier(X, n=1, l=1.):
         point.append(x[0] ** 2)
         points.append(np.array(point))
     return np.array(points)
+
+
 """
 N = 10
 x_range = np.linspace(-5, 20, 100)
