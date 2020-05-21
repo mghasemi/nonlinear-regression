@@ -57,7 +57,7 @@ def Fourier(n, deg, l=1.0):
     from numpy import sin, cos, prod
     from itertools import product
 
-    B = [lambda x: 1.0]
+    B = [lambda _: 1.0]
     E = list(product([0, 1], repeat=n))
     raw_coefs = list(product(range(deg + 1), repeat=n))
     coefs = set()
