@@ -394,13 +394,30 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         if len(X.shape) != 2:
             X = X.reshape(X.shape[0], 1)
         # Adjust the `self.x_mean` according to the weight
-        self.ci_band = (
-                self.t_stat
-                * self.training_var
-                * (
-                        1. / self.training_size
-                        + power(X - self.x_mean, 2)
-                        / sqrt(self.sum_sqrd_x - self.training_size * power(self.x_mean, 2))
-                )
-        ).reshape(1, -1)[0]
+        if X.shape[1] == 1:
+            self.ci_band = (
+                    self.t_stat
+                    * self.training_var
+                    * (
+                            1. / self.training_size
+                            + power(X - self.x_mean, 2)
+                            / sqrt(self.sum_sqrd_x - self.training_size * power(self.x_mean, 2))
+                    )
+            ).reshape(1, -1)[0]
         return array([self.apprx(x) for x in X])
+
+    def score(self, X, y, sample_weight=None):
+        """
+        The default scoring method is the weighted mean square error
+
+        :param X:
+        :param y:
+        :param sample_weight:
+        :return:
+        """
+        num_points = len(X)
+        weights = [self.regressor.meas.density(tuple(x)) for x in X]
+        vals = [self.apprx(x) for x in X]
+        sum_w = sum(weights)
+        errors = [weights[_] * (vals[_] - y[_]) ** 2 for _ in range(num_points)]
+        return sum(errors)[0] / sum_w

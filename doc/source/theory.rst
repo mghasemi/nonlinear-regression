@@ -112,22 +112,23 @@ big enough finite `B`, such that the above inequality holds. In other words, goo
     from matplotlib import cm
     import matplotlib.pyplot as plt
     import numpy as np
-    from SKSurrogate.NpyProximation import HilbertRegressor, FunctionBasis
+    from GeneralRegression.NpyProximation import HilbertRegressor, Measure
+    from GeneralRegression.extras import FunctionBasis
     def randrange(n, vmin, vmax):
         '''
-		Helper function to make an array of random numbers having shape (n, )
-		with each number distributed Uniform(vmin, vmax).
-		'''
+        Helper function to make an array of random numbers having shape (n, )
+        with each number distributed Uniform(vmin, vmax).
+        '''
         return (vmax - vmin)*np.random.rand(n) + vmin
 
     # degree of polynomials
-	deg = 2
+    deg = 2
     FB = FunctionBasis()
-    B = FB.Poly(2, deg)
+    B = FB.poly(2, deg)
     # initiate regressor
-	regressor = HilbertRegressor(base=B)
+    regressor = HilbertRegressor(base=B)
     # number of random points
-	n = 20
+    n = 20
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
     for c, m, zlow, zhigh in [('k', 'o', -5, -2.5)]:
@@ -144,9 +145,9 @@ big enough finite `B`, such that the above inequality holds. In other words, goo
     Y_ = np.arange(0, 1.0, 0.02)
     _X, _Y = np.meshgrid(X_, Y_)
     # fit the regressor
-	regressor.fit(X, y)
+    regressor.fit(X, y)
     # prepare the plot
-	Z = []
+    Z = []
     for idx in range(_X.shape[0]):
         _X_ = _X[idx]
         _Y_ = _Y[idx]

@@ -276,7 +276,7 @@ def plot_population_baseline(df, center='Regina', yrs=2, start=5., method='daily
     from random import randint
     from scipy.misc import derivative
     fig = plt.figure(randint(1, 10000), constrained_layout=True, figsize=(14, 12))
-    gs = fig.add_gridspec(6, 1)
+    gs = fig.add_gridspec(7, 1)
     f_ax1 = fig.add_subplot(gs[:3, :])
     ell = 20
     time_span = 1.2
@@ -297,12 +297,12 @@ def plot_population_baseline(df, center='Regina', yrs=2, start=5., method='daily
     x_f = np.linspace(start, max(x) + yrs * time_span, 200)
     # model1 = GenericRegressor(mixed, regressor=BayesianRidge, **dict(p_d=1, f_d=50, l=ell, e_d=0))
     x_min, x_max = x_t.min(), x_t.max()
-    x_mid = (x_min + x_max) / 2.
+    x_thrshld = x_min + 3 * (x_max - x_min) / 4.
     w_min = .1
     w_max = 5.
     ws = {_[0]:
           # w_min + (w_max - w_min) * (_[0] - x_min) / (x_max - x_min)  # if _[0]<.8 * x_max else 10.
-              .1 if _[0] < 1.5 * x_mid else 1.
+              .1 if _[0] < x_thrshld else 1.
           # 1. / (1. + np.exp(-(_[0] - 4. * x_mid / 5.)))
           # np.exp(-(_[0] - x_max) ** 2 / ((_[0] - x_min) ** 2 + 1.))
           for _ in x_t}
@@ -350,9 +350,15 @@ def plot_population_baseline(df, center='Regina', yrs=2, start=5., method='daily
     f_ax1.set_ylabel('Population')
     f_ax1.legend(loc=2)
     f_ax1.grid(True, linestyle='-.', alpha=.2)
-    f_ax3 = fig.add_subplot(gs[3:, :])
+    f_ax2 = fig.add_subplot(gs[3, :])
+    #f_ax2.set_title('Weights')
+    f_ax2.bar(Xs, Ws, label='Distibution', color='teal', alpha=.3)
+    f_ax2.set_ylabel('Weight')
+    f_ax2.set_xlabel('Dates')
+    f_ax3 = fig.add_subplot(gs[4:, :])
     gs = fs(x_f.reshape(-1, 1))
     gr = fr(x_f.reshape(-1, 1))
+    f_ax3.set_title("Growth Rate")
     f_ax3.plot(x_f, gs, color='lightgreen', linewidth=1, label="Sentenced")
     f_ax3.plot(x_f, gr, color='blue', linewidth=1, label="Remand")
     f_ax3.plot(x_f, gs + gr, color='red', linewidth=1, label="Total")
@@ -421,7 +427,7 @@ centers = ['Regina']  # , 'Saskatoon', 'PrinceAlbert', 'PineGrove']
 for cntr in centers:
     # holt_winters(df, center=cntr, start=0., yrs=yrs, method='monthly')
     # plot_population_hilbert(df, center=cntr, start=0., yrs=yrs, method='monthly')
-    plot_population_baseline(df, center=cntr, start=8.4, yrs=2, method='monthly')
+    plot_population_baseline(df, center=cntr, start=0., yrs=2, method='monthly')
     # plot_population(df, center=cntr, start=0., yrs=yrs, method='monthly')
 
 # prophet(df, center=cntr, yrs=yrs)
