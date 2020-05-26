@@ -420,4 +420,7 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         vals = [self.apprx(x) for x in X]
         sum_w = sum(weights)
         errors = [weights[_] * (vals[_] - y[_]) ** 2 for _ in range(num_points)]
-        return sum(errors)[0] / sum_w
+        try:
+            return sum(errors)[0] / sum_w
+        except IndexError:
+            return sum(errors) / sum_w
