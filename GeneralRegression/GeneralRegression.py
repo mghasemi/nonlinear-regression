@@ -39,7 +39,6 @@ class GenericRegressor(BaseEstimator, RegressorMixin):
 
     def predict(self, X):
         if self.std:
-            from numpy import sqrt
             from scipy.stats import norm
             pred, std = self.model.predict(X, return_std=True)
             z_bar = norm.ppf(self.ci, 0, 1)
@@ -49,55 +48,3 @@ class GenericRegressor(BaseEstimator, RegressorMixin):
             std = None
         self.standard_deviation = std
         return pred
-
-
-###########################################################
-import numpy as np
-
-
-def f(x):
-    return x * np.sin(x) - np.sqrt(x) * np.cos(2 * x) + x ** 2
-
-
-# Fourier base generator
-def fourier(X, n=1, l=1.):
-    points = []
-    for x in X:
-        point = []
-        for deg in range(n + 1):
-            if deg == 0:
-                point.append(1.)
-            else:
-                point.append(np.sin(deg * x[0] / l))
-                point.append(np.cos(deg * x[0] / l))
-        point.append(x[0])
-        point.append(x[0] ** 2)
-        points.append(np.array(point))
-    return np.array(points)
-
-
-"""
-N = 10
-x_range = np.linspace(-5, 20, 100)
-x_training = 10 * np.random.sample(N)
-y_training = f(x_training) + np.random.normal(scale=3., size=N)
-y_actual = f(x_range)
-colors = ['yellowgreen', 'gold', 'salmon', 'purple', 'teal', 'orange', 'green', 'red']
-
-plt.plot(x_range, y_actual, color='cornflowerblue', linewidth=1, label="ground truth")
-plt.scatter(x_training, y_training, color='navy', s=5, marker='o', label="training points")
-
-for count, degree in enumerate([7, 10]):
-    model = GenericRegressor(fourier, regressor=BayesianRidge, **dict(n=degree, l=3))
-    model.fit(x_training.reshape((-1, 1)), y_training)
-    y_plot = model.predict(x_range.reshape((-1, 1)))
-    plt.plot(x_range, y_plot, color=colors[count], linewidth=1, label="degree %d" % degree)
-    plt.fill_between(x_range,
-                     y_plot - model.ci_band,
-                     y_plot + model.ci_band,
-                     color=colors[count],
-                     alpha=0.1)
-plt.legend(loc=2)
-
-plt.show()
-"""

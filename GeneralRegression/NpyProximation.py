@@ -380,7 +380,7 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         res = array([self.apprx(x) for x in X])
         self.x_mean = X.mean()
         self.sum_sqrd_x = sum(power(X, 2))
-        self.training_var = sqrt(sum(power(res - y, 2)) / max(self.training_size - 2, 1))
+        self.training_var = sqrt(sum(power(res - y.reshape((1, -1))[0], 2)) / max(self.training_size - 2, 1))
         self.t_stat = t.ppf(self.c_limit, self.training_size - 1)
         return self
 
