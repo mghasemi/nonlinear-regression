@@ -161,3 +161,7 @@ big enough finite `B`, such that the above inequality holds. In other words, goo
 
 .. image:: ./images/polyreg.png
     :height: 400px
+
+Weighted & Unweighted Regression
+==================================
+pass

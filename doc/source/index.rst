@@ -10,6 +10,9 @@ Welcome to NonlinearRegression's documentation!
    :maxdepth: 2
    :caption: Contents:
 
+   theory
+   code
+
 
 
 Indices and tables

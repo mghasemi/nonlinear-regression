@@ -7,3 +7,4 @@ from .NpyProximation import (
 )
 from .GeneralRegression import GenericRegressor
 from .extras import FunctionBasis
+from .ModelSelection import TimeSeriesCV
