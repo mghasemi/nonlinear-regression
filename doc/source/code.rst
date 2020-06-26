@@ -9,3 +9,6 @@ Code Documentation
 
 .. automodule:: ModelSelection
    :members:
+
+.. automodule:: extras
+   :members:

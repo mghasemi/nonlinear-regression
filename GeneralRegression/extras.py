@@ -1,3 +1,9 @@
+"""
+Function Basis for `HilbertRegressor`
+===========================================
+"""
+
+
 class FunctionBasis(object):
     """
     This class generates two typical basis of functions: Polynomials and Trigonometric
