@@ -12,6 +12,7 @@ Welcome to NonlinearRegression's documentation!
 
    intro
    theory
+   TSCV
    code
 
 

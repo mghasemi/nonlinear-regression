@@ -332,3 +332,9 @@ The output looks like the following image:
 .. image:: ./images/weighted.png
     :height: 400px
 
+.. note::
+    The major code difference between `GenericRegressor` and `HilbertRegressor` lies in
+    the way they accept the basis functions.
+    The `funcs` parameter of `GenericRegressor` applies the set of basis function on the
+    input points and returns a new set of data points. While `HilbertRegressor` uses a set
+    of functions as `base` to perform the required calculations.
