@@ -1,7 +1,8 @@
 """
-Function Basis for `HilbertRegressor`
-===========================================
+Function Basis and Time to Interval transformer
+================================================
 """
+from datetime import datetime, date, timedelta
 
 
 class FunctionBasis(object):
@@ -82,3 +83,48 @@ class FunctionBasis(object):
 
                         base.append(f_)
         return base
+
+
+class Time2Interval(object):
+    """
+    Transforms a given date-time period into a real interval.
+
+    :param min_date: the start date of the time period (`datetime` object)
+    :param max_date: the end date of the time period (`datetime` object)
+    :param lower: (default = 0.) the real number that  corresponds to `min_date`
+    :param upper: (default = 1.) the real number that  corresponds to `max_date`
+    """
+
+    def __init__(self, min_date, max_date, lower=0, upper=1.):
+        if type(min_date) not in [datetime, date]:
+            raise TypeError("`min_date` must be `datetime` object")
+        if type(max_date) not in [datetime, date]:
+            raise TypeError("`max_date` must be `datetime` object")
+        self.min_date = min_date
+        self.max_date = max_date
+        self.lower = lower
+        self.upper = upper
+        t_length = (max_date - min_date).days
+        n_length = upper - lower
+        self.trans_coef = n_length / t_length
+        self.intercept = lower
+
+    def date2num(self, calendar_date):
+        """
+        Transforms a datetime object into a real number according to the initial parameters
+        :param calendar_date: a datetime object to be converted into real number
+        :return: the transformed number
+        """
+        if type(calendar_date) not in [datetime, date]:
+            raise TypeError("`calendar_date` must be `datetime` object")
+        corresponding_x_number = (calendar_date - self.min_date).days
+        corresponding_y_number = self.trans_coef * corresponding_x_number + self.intercept
+        return corresponding_y_number
+
+    def num2date(self, number):
+        """
+        Transforms back a given real number to a datetime relative to the initiation data
+        :param number: a real number to be converted to a date
+        :return: the transformed back datetime object associated to the input
+        """
+        return self.min_date + timedelta(days=(number - self.intercept) / self.trans_coef)
