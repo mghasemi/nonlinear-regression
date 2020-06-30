@@ -3,7 +3,7 @@ Function Basis and Time to Interval transformer
 ================================================
 """
 from datetime import datetime, date, timedelta
-
+from pandas import Timestamp
 
 class FunctionBasis(object):
     """
@@ -96,9 +96,9 @@ class Time2Interval(object):
     """
 
     def __init__(self, min_date, max_date, lower=0, upper=1.):
-        if type(min_date) not in [datetime, date]:
+        if type(min_date) not in [datetime, date, Timestamp]:
             raise TypeError("`min_date` must be `datetime` object")
-        if type(max_date) not in [datetime, date]:
+        if type(max_date) not in [datetime, date, Timestamp]:
             raise TypeError("`max_date` must be `datetime` object")
         self.min_date = min_date
         self.max_date = max_date
@@ -115,7 +115,7 @@ class Time2Interval(object):
         :param calendar_date: a datetime object to be converted into real number
         :return: the transformed number
         """
-        if type(calendar_date) not in [datetime, date]:
+        if type(calendar_date) not in [datetime, date, Timestamp]:
             raise TypeError("`calendar_date` must be `datetime` object")
         corresponding_x_number = (calendar_date - self.min_date).days
         corresponding_y_number = self.trans_coef * corresponding_x_number + self.intercept

@@ -246,7 +246,6 @@ In contrast to the previous example, the confidence intervals are 95% defaults f
 the curves, not the points::
 
     import numpy as np
-    from sklearn.datasets import make_regression
     import matplotlib.pyplot as plt
     from random import randint
 
@@ -338,3 +337,206 @@ The output looks like the following image:
     The `funcs` parameter of `GenericRegressor` applies the set of basis function on the
     input points and returns a new set of data points. While `HilbertRegressor` uses a set
     of functions as `base` to perform the required calculations.
+
+Time series as regression with missing steps
+================================================
+The following example illustrates how a typical time series problem with missing data
+can be treated as a regression problem while using all existing data points.
+
+**Using unweighted nonlinear regression**::
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    from random import randint
+    from sklearn.linear_model import BayesianRidge
+
+    from GeneralRegression.GeneralRegression import GenericRegressor
+    from GeneralRegression.extras import Time2Interval
+
+    df = pd.read_csv("./data/elec_cost.csv", parse_dates=['Effective Start Date (mm/dd/yyyy)'], infer_datetime_format=True)
+    dm, dx = df['Effective Start Date (mm/dd/yyyy)'].min(), df['Effective Start Date (mm/dd/yyyy)'].max()
+    time_trans = Time2Interval(dm, dx)
+    df['T'] = df.apply(lambda x: time_trans.date2num(x['Effective Start Date (mm/dd/yyyy)']), axis=1)
+
+    plt.figure(randint(1, 1000), figsize=(16, 12))
+
+    X = df[['T']].values
+    y = df['Cost'].values
+
+    def mixed(X, p_d=3, f_d=1, l=1., e_d=2):
+        """
+        A mixture of polynomial, Fourier and exponential functions
+
+        :param X: the domain to be transformed
+        :param p_d: the maximum degree of polynomials to be included
+        :param f_d: the maximum degree of discrete Fourier transform
+        :param e_d: the maximum degree of the `x` coefficient to be included as :math:`x^d\times e^{\pm x}`
+
+        :return: the transformed data points
+        """
+        points = []
+        for x in X:
+            point = []
+            point.append(1.)
+            for deg in range(1, f_d + 1):
+                point.append(np.sin(deg * x[0] / l))
+                point.append(np.cos(deg * x[0] / l))
+            for deg in range(1, p_d + 1):
+                point.append(x[0] ** deg)
+            for deg in range(e_d + 1):
+                point.append((x[0] ** deg) * np.exp(-x[0] / l))
+                point.append((x[0] ** deg) * np.exp(x[0] / (2.5 * l)))
+            points.append(np.array(point))
+        return np.array(points)
+
+    domain = np.linspace(min(X), max(X)+.5, 300)
+
+    regressor = GenericRegressor(mixed, regressor=BayesianRidge, **dict(p_d=5, f_d=50, l=1./12., e_d=-1))
+    regressor.fit(X, y)
+    y_pred = regressor.predict(domain)
+
+    plt.scatter(X, y, color='red', s=10, marker='o', alpha=0.5, label="Data points")
+    plt.plot(domain, y_pred, color='blue', label='Fit')
+    plt.fill_between(domain.reshape((1, -1))[0],
+                     y_pred - regressor.ci_band,
+                     y_pred + regressor.ci_band,
+                     color='purple',
+                     alpha=0.1, label='CI: 95%')
+    plt.legend(loc=2)
+    plt.grid(True, alpha=.4)
+    plt.title('Unweighted Nonlinear Regression')
+
+The output would be tha following:
+
+.. image:: ./images/ec_unw.png
+    :height: 400px
+
+**Using weighted nonlinear regression**::
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    from random import randint
+    from sklearn.linear_model import BayesianRidge
+
+    from GeneralRegression.NpyProximation import HilbertRegressor, Measure
+    from GeneralRegression.extras import FunctionBasis
+
+    df = pd.read_csv("./data/elec_cost.csv", parse_dates=['Effective Start Date (mm/dd/yyyy)'], infer_datetime_format=True)
+    dm, dx = df['Effective Start Date (mm/dd/yyyy)'].min(), df['Effective Start Date (mm/dd/yyyy)'].max()
+    time_trans = Time2Interval(dm, dx)
+    df['T'] = df.apply(lambda x: time_trans.date2num(x['Effective Start Date (mm/dd/yyyy)']), axis=1)
+
+    plt.figure(randint(1, 1000), figsize=(16, 12))
+
+    X = df[['T']].values
+    y = df['Cost'].values
+
+    def pfe_1d(p_d=3, f_d=3, l=1.):
+        basis = FunctionBasis()
+        p_basis = basis.poly(1, p_d)
+        f_basis = basis.fourier(1, f_d, l)[1:]
+        e_basis = []
+        return p_basis + f_basis + e_basis
+
+    domain = np.linspace(min(X), max(X)+.5, 300)
+
+    x_min, x_max = X.min(), X.max()
+    x_mid = (x_min + x_max) / 2.
+    w_min = .1
+    w_max = 5.
+    ws1 = {_[0]: 1./(1. + np.exp(-6*(_[0] - .35)))
+              for _ in X}
+    Xs1 = [_[0] for _ in X]
+    Ws1 = [ws1[_] for _ in Xs1]
+    ws2 = {_[0]: .1 if _[0] < x_mid else 1.
+              for _ in X}
+    Xs2 = [_[0] for _ in X]
+    Ws2 = [ws2[_] for _ in Xs2]
+    meas1 = Measure(ws1)
+    ell = 1./12
+    B1 = pfe_1d(p_d=4, f_d=20, l=ell)
+
+    regressor1 = HilbertRegressor(base=B1, meas=meas1)
+    regressor1.fit(X, y)
+    y_pred1 = regressor1.predict(domain)
+
+    meas2 = Measure(ws2)
+
+    regressor2 = HilbertRegressor(base=B1, meas=meas2)
+    regressor2.fit(X, y)
+    y_pred2 = regressor2.predict(domain)
+
+    fig = plt.figure(randint(1, 10000), constrained_layout=True, figsize=(16, 10))
+    gs = fig.add_gridspec(6, 1)
+    f_ax1 = fig.add_subplot(gs[:4, :])
+    f_ax1.scatter(X, y, color='red', s=10, marker='o', alpha=0.5, label="Data points")
+    f_ax1.plot(domain, y_pred1, color='blue', label='Fit 1')
+    f_ax1.plot(domain, y_pred2, color='teal', label='Fit 2')
+    f_ax1.fill_between(domain.reshape((1, -1))[0],
+                     y_pred1 - regressor1.ci_band,
+                     y_pred1 + regressor1.ci_band,
+                     color='purple',
+                     alpha=0.1, label='CI: 95%')
+    f_ax1.fill_between(domain.reshape((1, -1))[0],
+                     y_pred2 - regressor2.ci_band,
+                     y_pred2 + regressor2.ci_band,
+                     color='orange',
+                     alpha=0.1, label='CI: 95%')
+    f_ax1.legend(loc=1)
+    f_ax1.grid(True, linestyle='-.', alpha=.4)
+
+    f_ax2 = fig.add_subplot(gs[4, :])
+    f_ax2.set_title('Weight 1')
+    f_ax2.fill_between(Xs1, [0. for _ in Ws1], Ws1, label='Distibution', color='purple', alpha=.3)
+    f_ax2.set_ylabel('Weight')
+
+    f_ax3 = fig.add_subplot(gs[5:, :])
+    f_ax3.set_title('Weight 2')
+    f_ax3.fill_between(Xs2, [0. for _ in Ws2], Ws2, label='Distibution', color='orange', alpha=.3)
+    f_ax3.set_ylabel('Weight')
+
+The output would be tha following:
+
+.. image:: ./images/ec_w.png
+    :height: 400px
+
+And for what it worth
+
+**Using support vector regression with rbf**::
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import pandas as pd
+    from random import randint
+    from sklearn.svm import SVR
+
+    from GeneralRegression.extras import Time2Interval
+
+    df = pd.read_csv("./data/elec_cost.csv", parse_dates=['Effective Start Date (mm/dd/yyyy)'], infer_datetime_format=True)
+    dm, dx = df['Effective Start Date (mm/dd/yyyy)'].min(), df['Effective Start Date (mm/dd/yyyy)'].max()
+    time_trans = Time2Interval(dm, dx)
+    df['T'] = df.apply(lambda x: time_trans.date2num(x['Effective Start Date (mm/dd/yyyy)']), axis=1)
+
+    plt.figure(randint(1, 1000), figsize=(16, 12))
+
+    X = df[['T']].values
+    y = df['Cost'].values
+
+    domain = np.linspace(min(X), max(X)+.5, 300)
+
+    svr = SVR(kernel='rbf', tol=.0000001, C=10., epsilon=.0001)
+    svr.fit(X, y)
+    y_pred = svr.predict(domain)
+
+    plt.scatter(X, y, color='red', s=10, marker='o', alpha=0.5, label="Data points")
+    plt.plot(domain, y_pred, color='blue', label='Fit')
+    plt.legend(loc=2)
+    plt.grid(True, alpha=.4)
+    plt.title('Unweighted Nonlinear Regression')
+
+The output would be tha following:
+
+.. image:: ./images/ec_svr.png
+    :height: 400px

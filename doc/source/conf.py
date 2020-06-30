@@ -12,6 +12,7 @@
 #
 import os
 import sys
+
 # sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../../GeneralRegression/'))
 sys.path.insert(0, os.path.abspath('../GeneralRegression/'))
@@ -20,7 +21,7 @@ sys.path.insert(0, os.path.abspath('../GeneralRegression/'))
 
 project = 'NonlinearRegression'
 copyright = '2020, Mehdi Ghasemi'
-author = 'Mehdi Ghasemi'
+author = 'Mehdi Ghasemi'  # "Community Solution Accelerator- EPS"  #
 
 # The full version, including alpha/beta/rc tags
 release = '0.1'
