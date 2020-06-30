@@ -17,7 +17,7 @@ Dependencies
 
 Download
 =============================
-`NonlinearRegression` can be obtained from `https://gitlab.com/mghasemi/nonlinear-regression <https://gitlab.com/mghasemi/nonlinear-regression>`_.
+`NonlinearRegression` can be obtained from `https://github.com/mghasemi/nonlinear-regression <https://github.com/mghasemi/nonlinear-regression>`_.
 
 Installation
 =============================
@@ -29,7 +29,7 @@ Documentation
 =============================
 The documentation is produced by `Sphinx <http://www.sphinx-doc.org/en/stable/>`_ and is intended to cover code usage
 as well as a bit of theory to explain each method briefly.
-For more details refer to the documentation at `nonlinear-regression.rtfd.io/ <http://nonlinear-regression.rtfd.io/>`_.
+For more details refer to the documentation at `nonlinearregression.rtfd.io/ <http://nonlinearregression.rtfd.io/>`_.
 
 License
 =============================
