@@ -1,5 +1,8 @@
-=============================
-Introduction
+|Doc| |Licence|
+
+|Logo|
+
+NonlinearRegression
 =============================
 ``NonlinearRegression`` is a small suit of tools to perform nonlinear regression, `scikitlearn` style.
 It uses linear regression and data transformation to perform unweighted nonlinear regression
@@ -57,3 +60,11 @@ MIT License
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
+
+
+.. |Logo| image:: ./doc/source/images/8ball.png
+.. |Doc| image:: https://readthedocs.org/projects/nonlinear-regression/badge/?version=latest
+    :target: https://readthedocs.org/projects/nonlinear-regression/badge/?version=latest
+    :alt: Documentation Status
+.. |Licence| image:: https://img.shields.io/badge/license-MIT-blue.svg
+   :target: https://github.com/mghasemi/sksurrogate/blob/master/License.txt
