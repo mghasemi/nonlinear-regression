@@ -20,7 +20,7 @@ Dependencies
 
 Download
 =============================
-`NonlinearRegression` can be obtained from `https://gitlab.com/mghasemi/nonlinear-regression <https://gitlab.com/mghasemi/nonlinear-regression>`_.
+`NonlinearRegression` can be obtained from `https://github.com/mghasemi/nonlinear-regression <https://github.com/mghasemi/nonlinear-regression>`_.
 
 Installation
 =============================
