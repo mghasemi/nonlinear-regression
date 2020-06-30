@@ -64,7 +64,7 @@ MIT License
 
 .. |Logo| image:: ./doc/source/images/8ball.png
 .. |Doc| image:: https://readthedocs.org/projects/nonlinearregression/badge/?version=latest
-    :target: https://readthedocs.org/projects/nonlinearregression/badge/?version=latest
+    :target: https://nonlinearregression.readthedocs.io/en/latest/
     :alt: Documentation Status
 .. |Licence| image:: https://img.shields.io/badge/license-MIT-blue.svg
    :target: https://github.com/mghasemi/sksurrogate/blob/master/License.txt
