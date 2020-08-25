@@ -7,6 +7,12 @@ from numpy.linalg import det
 from scipy import integrate
 from scipy.stats import t
 
+try:
+    from sklearn.base import BaseEstimator, RegressorMixin
+except ModuleNotFoundError:
+    BaseEstimator = type("BaseEstimator", (object,), dict())
+    RegressorMixin = type("RegressorMixin", (object,), dict())
+
 Infinitesimal = 1e-7
 
 
@@ -312,13 +318,6 @@ class Regression(object):
         return aprx
 
 
-try:
-    from sklearn.base import BaseEstimator, RegressorMixin
-except ModuleNotFoundError:
-    BaseEstimator = type("BaseEstimator", (object,), dict())
-    RegressorMixin = type("RegressorMixin", (object,), dict())
-
-
 class HilbertRegressor(BaseEstimator, RegressorMixin):
     r"""
     Regression using Hilbert Space techniques Scikit-Learn style.
@@ -330,19 +329,21 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
     :param meas: `NpyProximation.Measure`, default = None
         the measure to form the :math:`L_2(\mu)` space. If `None` a discrete measure will be constructed based
         on `fit` inputs
-    :param fspace: `NpyProximation.FunctionBasis`, default = None
+    :param f_space: `NpyProximation.FunctionBasis`, default = None
         the function subspace of :math:`L_2(\mu)`, if `None` it will be initiated according to `self.meas`
+    :param c_limit: for confidence interval
+    :param apprx: It is a callable, this will be constructed on `fit` method. It use for approximate after
+        fitting/learning.
     """
 
-    def __init__(self, deg=3, base=None, meas=None, fspace=None, c_limit=.95):
+    def __init__(self, deg=3, base=None, meas=None, f_space=None, c_limit=.95):
         self.deg = deg
         self.meas = meas
         self.base = base
-        self.fspace = fspace
+        self.f_space = f_space
         self.regressor = None
         self.dim = 0
         self.apprx = None
-        # for confidence interval
         self.c_limit = (c_limit + 1.0) / 2.0
         self.t_stat = 0.
         self.training_var = 0.
@@ -368,14 +369,14 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         self.dim = X[0].shape[0]
         if self.meas is not None:
             self.regressor.set_measure(self.meas)
-        if self.fspace is not None:
-            self.regressor.set_func_spc(self.fspace)
+        if self.f_space is not None:
+            self.regressor.set_func_spc(self.f_space)
         else:
             from .extras import FunctionBasis
             bs = FunctionBasis()
             B = bs.poly(n=self.dim, deg=self.deg) if self.base is None else self.base
-            self.fspace = FunctionSpace(dim=self.dim, basis=B, measure=self.meas)
-            self.regressor.set_func_spc(self.fspace)
+            self.f_space = FunctionSpace(dim=self.dim, basis=B, measure=self.meas)
+            self.regressor.set_func_spc(self.f_space)
         self.apprx = self.regressor.fit()
         res = array([self.apprx(x) for x in X])
         self.x_mean = X.mean()
@@ -417,9 +418,9 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         """
         num_points = len(X)
         weights = [self.regressor.meas.density(tuple(x)) for x in X]
-        vals = [self.apprx(x) for x in X]
+        values = [self.apprx(x) for x in X]
         sum_w = sum(weights)
-        errors = [weights[_] * (vals[_] - y[_]) ** 2 for _ in range(num_points)]
+        errors = [weights[_] * (values[_] - y[_]) ** 2 for _ in range(num_points)]
         try:
             return sum(errors)[0] / sum_w
         except IndexError:
