@@ -30,8 +30,8 @@ class FunctionBasis(object):
             if sum(o) <= deg:
                 if n > 1:
                     base.append(lambda x, e=o: prod([x[i] ** e[i] for i in range(n)]))
-                else:
-                    base.append(lambda x, e=o: prod([x ** e[i] for i in range(n)]))
+                else:  # One-dimensional case
+                    base.append(lambda x, e=o: x[0] ** e[0])
         return base
 
     @staticmethod
