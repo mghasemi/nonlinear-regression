@@ -3,7 +3,9 @@ Function Basis and Time to Interval transformer
 ================================================
 """
 from datetime import datetime, date, timedelta
+
 from pandas import Timestamp
+
 
 class FunctionBasis(object):
     """
@@ -23,7 +25,7 @@ class FunctionBasis(object):
         :return: the raw basis consists of polynomials of degrees up to `n`
         """
         from itertools import product
-        from numpy import prod
+        from numpy import prod, power
 
         base = []
         for o in product(range(deg + 1), repeat=n):
@@ -31,7 +33,7 @@ class FunctionBasis(object):
                 if n > 1:
                     base.append(lambda x, e=o: prod([x[i] ** e[i] for i in range(n)]))
                 else:  # One-dimensional case
-                    base.append(lambda x, e=o: x[0] ** e[0])
+                    base.append(lambda x, e=o: power(x, e[0]))  # if x.shape[0] > 0 else x ** e[0])
         return base
 
     @staticmethod
@@ -71,15 +73,10 @@ class FunctionBasis(object):
                                 ]
                             )
                         else:
-                            f_ = lambda x, o_=o, ex_=ex: prod(
-                                [
-                                    sin(o_[i] * x / l) ** ex_[i]
-                                    * cos(o_[i] * x / l) ** (1 - ex_[i])
-                                    if o_[i] > 0
-                                    else 1.0
-                                    for i in range(n)
-                                ]
-                            )
+                            f_ = lambda x, o_=o, ex_=ex: (sin(o_[0] * x[0] / l) ** ex_[0]) * cos(o_[0] * x[0] / l) ** (
+                                        1 - ex_[0]) \
+                                if tuple(o_)[0] > 0 \
+                                else 1.0
 
                         base.append(f_)
         return base

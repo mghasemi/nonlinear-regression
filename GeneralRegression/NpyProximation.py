@@ -43,6 +43,7 @@ class Measure(object):
     def __init__(self, density=None, domain=None):
 
         # set the density
+        self.idx = 0
         if density is None:
             self.density = lambda x: 1.0
         elif callable(density):
@@ -91,7 +92,10 @@ class Measure(object):
             m = integrate.nquad(fw, self.supp)[0]
         else:
             for p in self.supp:
-                m += self.density(p) * fn(p)
+                dp = self.density(p)
+                if type(p) is not tuple:
+                    p = (p,)
+                m += dp * fn(p)
         return m
 
     def norm(self, p, f):
@@ -381,7 +385,7 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         res = array([self.apprx(x) for x in X])
         self.x_mean = X.mean()
         self.sum_sqrd_x = sum(power(X, 2))
-        self.training_var = sqrt(sum(power(res - y.reshape((1, -1))[0], 2)) / max(self.training_size - 2, 1))
+        self.training_var = sqrt(sum(power(res.reshape(-1) - y.reshape(-1), 2)) / max(self.training_size - 2, 1))
         self.t_stat = t.ppf(self.c_limit, self.training_size - 1)
         return self
 
@@ -404,7 +408,7 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
                             + power(X - self.x_mean, 2)
                             / sqrt(self.sum_sqrd_x - self.training_size * power(self.x_mean, 2))
                     )
-            ).reshape(1, -1)[0]
+            ).reshape(-1, 1)#[0]
         return array([self.apprx(x) for x in X])
 
     def score(self, X, y, sample_weight=None):
