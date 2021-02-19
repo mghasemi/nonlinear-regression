@@ -4,7 +4,7 @@
 
 NonlinearRegression
 =============================
-``NonlinearRegression`` is a small suit of tools to perform nonlinear regression, `scikitlearn` style.
+``NonlinearRegression`` is a small suite of tools to perform nonlinear regression, `scikitlearn` style.
 It uses linear regression and data transformation to perform unweighted nonlinear regression
 and implements a version of function spaces as Hilbert spaces to do weighted nonlinear regression.
 
