@@ -10,7 +10,7 @@ setup(
     version="0.0.1",
     author="Mehdi Ghasemi",
     author_email="mehdi.ghasemi@gmail.com",
-    packages=["NonlinearRegression"],
+    packages=["GeneralRegression"],
     url="https://gitlab.com/mghasemi/nonlinear-regression",
     license="MIT License",
     description=Description,
@@ -26,5 +26,6 @@ setup(
         "scipy",
         "matplotlib",
         "scikit-learn",
+        "pandas",
     ],
 )

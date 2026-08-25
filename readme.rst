@@ -16,7 +16,9 @@ Dependencies
 
     - `NumPy <http://www.numpy.org/>`_,
     - `scipy <https://www.scipy.org/>`_,
+    - `matplotlib <https://matplotlib.org/>`_,
     - `scikit-learn <https://scikit-learn.org/stable/>`_,
+    - `pandas <https://pandas.pydata.org/>`_,
 
 Download
 =============================

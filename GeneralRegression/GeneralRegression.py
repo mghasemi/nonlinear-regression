@@ -1,8 +1,12 @@
+from scipy.stats import norm
 from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.linear_model import BayesianRidge
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import FunctionTransformer
 
 
 class GenericRegressor(BaseEstimator, RegressorMixin):
-    """
+    r"""
     Uses a linear regression algorithm and a transformer to perform nonlinear regression.
     Using a set of functions :math:`(f_0,\dots,f_n)`, and a point :math:`x`, lifts the point
     :math:`x` to :math:`(x, f_0(x),\dots,f_n(x))` and applies a linear regression. The result
@@ -14,7 +18,6 @@ class GenericRegressor(BaseEstimator, RegressorMixin):
     :param kwargs: argument to be passed to `funcs`
     """
     def __init__(self, funcs, regressor=None, ci=.95, **kwargs):
-        from sklearn.linear_model import BayesianRidge
         self.funcs = funcs
         self.kw_ar = kwargs
         # to store the standard deviations of the predicted values
@@ -40,9 +43,6 @@ class GenericRegressor(BaseEstimator, RegressorMixin):
         :param y: Target values
         :return: `self`
         """
-        from sklearn.pipeline import make_pipeline
-        from sklearn.preprocessing import FunctionTransformer
-        from sklearn.linear_model import BayesianRidge
         if self.regressor is BayesianRidge:
             self.std = True
             regressor = self.regressor(compute_score=True)
@@ -63,7 +63,6 @@ class GenericRegressor(BaseEstimator, RegressorMixin):
         :return: returns predicted values
         """
         if self.std:
-            from scipy.stats import norm
             pred, std = self.model.predict(X, return_std=True)
             z_bar = norm.ppf(self.ci, 0, 1)
             self.ci_band = z_bar * std  # / sqrt(max(self.size - 1 , 1))

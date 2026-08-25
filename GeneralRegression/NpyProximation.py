@@ -170,7 +170,9 @@ class FunctionSpace(object):
         cfs = array([[0.0] * num] * num)
         for i in range(num):
             for j in range(i, num):
+                # NumPy>=2 no longer implicitly casts (even single-element) arrays to scalars
                 cf = self.inner(self.base[i], self.base[j])
+                cf = cf.item() if isinstance(cf, ndarray) else cf
                 cfs[i][j] = cf
                 cfs[j][i] = cf
         self.Gram = cfs
@@ -178,17 +180,16 @@ class FunctionSpace(object):
     def minor_gram(self, i):
         if self.Gram is None:
             self.gram_mat()
-        return array(
-            [[self.Gram[idx][jdx] for idx in range(i + 1)] for jdx in range(i + 1)]
-        )
+        # Gram is symmetric, so the leading (i+1)x(i+1) slice equals the
+        # element-wise construction below, but avoids an O(i^2) Python loop.
+        return self.Gram[: i + 1, : i + 1]
 
     def minor(self, i, j):
         if j == 1:
             return 1.0
-        cfs = array([[0.0] * j] * (j - 1))
-        for jdx in range(j):
-            for idx in range(j - 1):
-                cfs[idx][jdx] = self.Gram[idx][jdx]
+        # equivalent to building cfs[idx][jdx] = self.Gram[idx][jdx] via a
+        # double loop, but avoids the O(j^2) Python-level overhead.
+        cfs = self.Gram[: j - 1, :j]
         return det(delete(cfs, i, 1))
 
     def form_basis(self):
@@ -408,8 +409,8 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
                             + power(X - self.x_mean, 2)
                             / sqrt(self.sum_sqrd_x - self.training_size * power(self.x_mean, 2))
                     )
-            ).reshape(-1, 1)#[0]
-        return array([self.apprx(x) for x in X])
+            ).reshape(-1)
+        return array([self.apprx(x) for x in X]).reshape(-1)
 
     def score(self, X, y, sample_weight=None):
         """

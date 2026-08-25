@@ -17,7 +17,7 @@ y = f(X).reshape((1, -1))[0]
 
 # Function basis generator
 def mixed(X, p_d=3, f_d=1, l=1., e_d=2):
-    """
+    r"""
     A mixture of polynomial, Fourier and exponential functions
 
     :param X: the domain to be transformed

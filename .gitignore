@@ -1,0 +1,4 @@
+.venv/
+.vscode/
+GeneralRegression/__pycache__/
+NonlinearRegression.egg-info/

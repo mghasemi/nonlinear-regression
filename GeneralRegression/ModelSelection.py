@@ -58,9 +58,8 @@ class TimeSeriesCV(BaseCrossValidator, metaclass=ABCMeta):
             train/test set.
         :return: `train` The training set indices for that split. `test` The testing set indices for that split.
         """
-        from copy import copy
-        X_c = copy(X)
-        sorted_index = X_c[:, self.index].argsort()
+        # argsort only reads the column, so no copy of X is needed
+        sorted_index = X[:, self.index].argsort()
         cut = int(self.train_ratio * sorted_index.shape[0])
         train_index = sorted_index[: cut]
         test_index = sorted_index[cut:]
