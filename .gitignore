@@ -2,3 +2,4 @@
 .vscode/
 GeneralRegression/__pycache__/
 NonlinearRegression.egg-info/
+doc/build/

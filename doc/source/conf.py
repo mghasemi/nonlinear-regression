@@ -21,10 +21,10 @@ sys.path.insert(0, os.path.abspath('../GeneralRegression/'))
 
 project = 'NonlinearRegression'
 copyright = '2020, Mehdi Ghasemi'
-author = "Community Solution Accelerator- EPS"  # 'Mehdi Ghasemi'  #
+author = "Mehdi Ghasemi"
 
 # The full version, including alpha/beta/rc tags
-release = '0.1'
+release = '0.2'
 
 # The master toctree document.
 master_doc = 'index'
