@@ -7,7 +7,7 @@ Description = "This repository contains a structured code that facilitates non-l
 
 setup(
     name="NonlinearRegression",
-    version="0.0.1",
+    version="0.3",
     author="Mehdi Ghasemi",
     author_email="mehdi.ghasemi@gmail.com",
     packages=["GeneralRegression"],

@@ -23,8 +23,11 @@ project = 'NonlinearRegression'
 copyright = '2020, Mehdi Ghasemi'
 author = "Mehdi Ghasemi"
 
+# The short X.Y version
+version = '0.3'
+
 # The full version, including alpha/beta/rc tags
-release = '0.2'
+release = '0.3'
 
 # The master toctree document.
 master_doc = 'index'
