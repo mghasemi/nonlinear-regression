@@ -451,7 +451,10 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         on `fit` inputs
     :param f_space: `NpyProximation.FunctionBasis`, default = None
         the function subspace of :math:`L_2(\mu)`, if `None` it will be initiated according to `self.meas`
-    :param c_limit: for confidence interval
+    :param c_limit: float in (0., 1.), default .95
+        two-sided confidence level for the mean-response band (e.g. .95). Stored verbatim
+        so that scikit-learn's ``clone`` works; the one-sided quantile argument ``(c_limit+1)/2``
+        is applied at fit time when computing :attr:`t_stat`.
     :param apprx: It is a callable, this will be constructed on `fit` method. It use for approximate after
         fitting/learning.
     """
@@ -464,7 +467,8 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         self.regressor = None
         self.dim = 0
         self.apprx = None
-        self.c_limit = (c_limit + 1.0) / 2.0
+        # NOTE: must be stored verbatim (no arithmetic) for sklearn cloneability.
+        self.c_limit = c_limit
         self.t_stat = 0.
         self.training_var = 0.
         self.training_size = 0
@@ -517,7 +521,9 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
         self.training_var = float(np.sqrt(
             float(w_all @ res_vec ** 2) / max(self.df, 1))) \
             if self.df > 0 else float("nan")
-        self.t_stat = t.ppf(self.c_limit, max(self.df, 1)) \
+        # one-sided quantile argument for the two-sided band at level self.c_limit:
+        q = 0.5 * (1.0 + self.c_limit)
+        self.t_stat = t.ppf(q, max(self.df, 1)) \
             if self.df > 0 and not np.isnan(self.training_var) else 0.0
         # Backward-compatible attributes (no longer used by predict).
         if X.shape[1] == 1:

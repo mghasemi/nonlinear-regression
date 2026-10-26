@@ -59,6 +59,15 @@ Bug fixes found by a 2026-10-26 validation pass (`tests/test_fixes_20261026.py`)
   round-off only.
 - **``Time2Interval`` preserves sub-day resolution** (previously ``.days`` truncated intraday
   timestamps onto whole days) and raises ``ValueError`` for an empty time span.
+- **``HilbertRegressor.c_limit`` now stores the raw confidence level passed by the user**
+  (e.g. ``0.95``); previously it stored the transformed one-sided quantile argument
+  ``(level+1)/2 = 0.975``. The transformation is applied at fit time. This was required for
+  scikit-learn compliance: the estimator could not be cloned by ``sklearn.base.clone``, which
+  broke any pipeline/CV usage such as ``cross_val_score(..., cv=TimeSeriesCV())``.
+- **``TimeSeriesCV`` supports walk-forward folds**: new parameter ``n_splits`` (default 1,
+  reproducing the original single split exactly). For ``n_splits >= 2`` the test region is
+  partitioned into contiguous time chunks and each fold trains on everything strictly before
+  its chunk (expanding window, no leakage). Degenerate ratios/indices now raise ``ValueError``.
 
 License
 =============================

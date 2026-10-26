@@ -17,6 +17,8 @@ V4  Time2Interval preserves sub-day resolution (old `.days` truncated intraday
 V5  score() is R^2 per the scikit-learn convention; mse() keeps the old weighted
     MSE semantics.
 V6  elec_cost.csv fit still agrees with numpy.polyfit (regression check).
+V7  TimeSeriesCV: default single split is unchanged, n_splits >= 2 gives a leak-free
+    expanding walk-forward window, degenerate/invalid inputs raise ValueError.
 
 Run:  python tests/test_fixes_20261026.py   (plain asserts, no framework needed)
 """
@@ -30,6 +32,7 @@ from scipy.stats import t
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from GeneralRegression.NpyProximation import HilbertRegressor
+from GeneralRegression.ModelSelection import TimeSeriesCV
 from GeneralRegression.extras import Time2Interval
 
 
@@ -49,8 +52,8 @@ def v1_ci_band_exact():
     df = n - k
     yhat = np.array([float(np.ravel(model.apprx(x_))[0]) for x_ in X]).ravel()
     s = float(np.sqrt(np.sum((y - yhat) ** 2) / df))
-    # model.c_limit stores the one-sided quantile arg ((level+1)/2), i.e. .975 for a 95% CI:
-    tval = t.ppf(model.c_limit, df)
+    # model.c_limit stores the raw two-sided level (e.g. .95); one-sided quantile arg is (level+1)/2:
+    tval = t.ppf(0.5 * (1.0 + model.c_limit), df)
     xbar = X.ravel().mean()
     Sxx = float(np.sum((X.ravel() - xbar) ** 2))
     band_ref = tval * s * np.sqrt(1.0 / n + (xq.ravel() - xbar) ** 2 / Sxx)
@@ -91,7 +94,7 @@ def v1_ci_band_exact():
     yhat_fit = np.array([float(np.ravel(m_ref.apprx(x_))[0]) for x_ in X]).ravel()
     s_pkg = float(np.sqrt(np.sum((y - yhat_fit) ** 2) / df4))
     # band = t * s_pkg * sqrt(b'(A'A)^-1 b); var_theory carries sigma^2, so strip it:
-    band_theory_xstar = (t.ppf(m_ref.c_limit, df4) * s_pkg
+    band_theory_xstar = (t.ppf(0.5 * (1.0 + m_ref.c_limit), df4) * s_pkg
                          * float(np.sqrt(var_theory)) / sigma)
     assert abs(float(m_ref.ci_band[0]) - band_theory_xstar) < 1e-8 * band_theory_xstar, \
         (m_ref.ci_band[0], band_theory_xstar)
@@ -209,6 +212,68 @@ def v6_elec_cost():
           f"T-column cross-check passes")
 
 
+def v7_timeseriescv():
+    rng = np.random.default_rng(3)
+    n = 100
+    tcol = np.arange(n, dtype=float) + rng.normal(0.0, 0.05, n)   # noisy times -> sort matters
+    X = np.column_stack([tcol, np.arange(n, dtype=float)])
+
+    # default (n_splits=1): must reproduce the original single-split behavior exactly —
+    # first train_ratio of observations in time order train, remainder test.
+    cv = TimeSeriesCV()
+    assert cv.get_n_splits() == 1
+    splits = list(cv.split(X))
+    assert len(splits) == 1
+    tr, te = splits[0]
+    order = np.argsort(tcol, kind="stable")
+    assert list(tr) == list(order[:80]), "default single split no longer matches v0.2"
+    assert list(te) == list(order[80:]), "default single split no longer matches v0.2"
+
+    # n_splits=3: test region = last 20 (chunks 7/7/6), expanding train, no leakage
+    cv3 = TimeSeriesCV(n_splits=3)
+    assert cv3.get_n_splits() == 3
+    folds = list(cv3.split(X))
+    assert len(folds) == 3
+    bounds = [80, 87, 94]
+    sizes = [7, 7, 6]
+    for i, (tr_i, te_i) in enumerate(folds):
+        # leak-free: every training observation is strictly earlier than every test one
+        assert float(tcol[tr_i].max()) < float(tcol[te_i].min()), f"fold {i}: time leakage"
+        assert len(tr_i) == bounds[i], f"fold {i} train size {len(tr_i)} != {bounds[i]}"
+        assert len(te_i) == sizes[i], f"fold {i} test size {len(te_i)} != {sizes[i]}"
+        # training window is nested: fold i trains on a superset of fold i-1's data
+        if i > 0:
+            assert set(folds[i - 1][0].tolist()) <= set(tr_i.tolist()), "window not expanding"
+
+    # degenerate / invalid inputs raise cleanly (split is a generator -> iterate to trigger)
+    for bad in (lambda: TimeSeriesCV(n_splits=0),
+                lambda: list(TimeSeriesCV(index=-1).split(X)),
+                lambda: list(TimeSeriesCV(index=3).split(X)),
+                lambda: list(TimeSeriesCV(test_ratio=0.05).split(np.ones((4, 2))))):
+        try:
+            bad()
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected ValueError")
+
+    # sklearn cloneability: cross_val_score clones the estimator per fold; HilbertRegressor
+    # used to fail here because __init__ stored (c_limit+1)/2 instead of the raw parameter.
+    from sklearn.base import clone as _clone
+    m_c = _clone(HilbertRegressor(deg=1, c_limit=.95))
+    assert m_c.c_limit == 0.95 and m_c.deg == 1
+
+    # and it plugs into sklearn's cross_val_score with the package's own regressor
+    from sklearn.model_selection import cross_val_score
+    yv = np.sin(2.0 * tcol) + 0.05 * rng.standard_normal(n)
+    scores = cross_val_score(HilbertRegressor(deg=1), X, yv, cv=cv3)
+    assert len(scores) == 3 and all(np.isfinite(s) for s in scores), f"scores {scores}"
+
+    print("V7 OK   TimeSeriesCV default split unchanged; walk-forward n_splits=3 leak-free "
+          "(expanding); invalid inputs raise ValueError; estimator is sklearn-cloneable and "
+          "cross_val_score integration works")
+
+
 if __name__ == "__main__":
     v1_ci_band_exact()
     v2_conditioning()
@@ -216,4 +281,5 @@ if __name__ == "__main__":
     v4_time2interval()
     v5_score_mse()
     v6_elec_cost()
+    v7_timeseriescv()
     print("\nALL CHECKS PASSED")
