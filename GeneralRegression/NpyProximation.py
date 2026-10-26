@@ -3,6 +3,7 @@ Hilbert Space based regression
 ==================================
 """
 from numpy import sqrt, array, ndarray, delete, concatenate, power
+import numpy as np
 from numpy.linalg import det
 from scipy import integrate
 from scipy.stats import t
@@ -23,6 +24,36 @@ class Error(Exception):
 
     def __init__(self, *args):
         super(Error, self).__init__(*args)
+
+
+# Condition-number threshold below which the Gram-determinant orthogonalization
+# is used; above it the QR fallback on basis evaluations takes over (see
+# ``FunctionSpace.form_basis``). Empirical crossover for monomial bases on
+# [0, 1]: cond ~ 2e12 already degrades fits by O(1e-3), so we stay well below.
+GRAM_COND_LIMIT = 1.0e10
+
+
+def _spike_value(x, abscissa, value):
+    r"""
+    Exact-match spike kernel used by :class:`Regression` to build the data
+    function :math:`f`.
+
+    Returns ``value`` iff ``x`` coincides with ``abscissa`` within a relative
+    tolerance (float round-off only); otherwise returns 0. The old absolute
+    window of :math:`10^{-4}` silently merged distinct abscissas that are
+    closer than that in *normalized* units — e.g., hourly timestamps mapped by
+    ``Time2Interval`` onto a multi-year span (where one unit spans thousands of
+    days), so adjacent observations collapsed into the same spike.
+
+    :param x: evaluation point (tuple or array)
+    :param abscissa: abscissa array to match against
+    :param value: contribution at that abscissa
+    """
+    from numpy import abs as _abs, maximum, ravel
+
+    d = _abs(ravel(array(x)) - abscissa)
+    tol = 1.0e-9 * maximum(1.0, _abs(abscissa))
+    return value if bool((d <= tol).all()) else 0.0
 
 
 class Measure(object):
@@ -192,6 +223,72 @@ class FunctionSpace(object):
         cfs = self.Gram[: j - 1, :j]
         return det(delete(cfs, i, 1))
 
+    def _eval_matrix(self, nodes=None, weights=None):
+        r"""
+        Evaluates the raw basis at support/quadrature nodes: returns ``(E, w)``
+        with :math:`E_{ki} = \varphi_i(s_k)` and the positive node weights.
+
+        For discrete measures the support points *are* the nodes (exact); for
+        continuous one-dimensional measures a Gauss–Legendre grid on the domain
+        box is used, so orthogonality holds w.r.t. the quadrature rather than the
+        full integral. Not available for continuous measures in dim >= 2.
+
+        The ``nodes``/``weights`` arguments are reserved (currently unused).
+        """
+        if not self.measure.continuous:
+            keys = list(self.measure.supp)
+            E = np.array([
+                [float(np.ravel(phi(array(k))) [0]) for phi in self.base]
+                for k in keys
+            ])
+            w = np.array([self.measure.density(k) for k in keys], dtype=float)
+            return E, w
+        if len(self.measure.supp) == 1:
+            lo, hi = float(self.measure.supp[0][0]), float(self.measure.supp[0][1])
+            from numpy.polynomial.legendre import leggauss
+            n_nodes = max(2 * len(self.base) + 8, 32)
+            z, wz = leggauss(n_nodes)
+            mid, half = 0.5 * (lo + hi), 0.5 * (hi - lo)
+            E = np.array([
+                [float(np.ravel(phi(array([mid + half * zz]))) [0]) for phi in self.base]
+                for zz in z
+            ])
+            w = np.asarray(wz, dtype=float) * half
+            return E, w
+        raise Error("QR fallback is not available for continuous measures in dimension >= 2; "
+                    "use a discrete measure or reduce the basis size.")
+
+    def _form_basis_qr(self):
+        r"""
+        Weighted QR orthogonalization on basis evaluations (fallback when the
+        Gram matrix is ill-conditioned). Produces callables
+        :math:`\tilde{\varphi}_i = \sum_j c_{ij}\,\varphi_j` whose evaluation vectors at the
+        nodes are orthonormal, i.e. mutually orthogonal w.r.t. the (quadrature of
+        the) measure — exact for discrete measures.
+
+        Raises :class:`Error` if the basis is linearly dependent on the support.
+        """
+        from numpy import sqrt as _sqrt
+
+        E, weights = self._eval_matrix(None, None)
+        A = E * _sqrt(weights)[:, None]
+        rank = np.linalg.matrix_rank(A)
+        if rank < len(self.base):
+            raise Error(
+                f"the basis (size {len(self.base)}) is linearly dependent on the support "
+                f"(rank {rank}); reduce deg or the basis."
+            )
+        Q, _ = np.linalg.qr(A)
+        # coefficients c_i with A c_i = q_i; lstsq returns them COLUMN-wise:
+        # column i of C is the raw-basis coefficient vector of tilde-phi_i.
+        C = np.linalg.lstsq(A, Q, rcond=None)[0]
+        self.orth_base = []
+        for i_ in range(C.shape[1]):
+            fn = lambda x, i_=i_: sum(
+                [C[j, i_] * self.base[j](x) for j in range(len(self.base))]
+            )
+            self.orth_base.append(fn)
+
     def form_basis(self):
         """
         Call this method to generate the orthogonal basis corresponding
@@ -199,8 +296,22 @@ class FunctionSpace(object):
         The result will be stored in a property called ``orth_base`` which
         is a list of function that are orthogonal to each other with
         respect to the measure ``measure`` over the given range ``domain``.
+
+        Uses Gram-determinant coefficients while :math:`\\mathrm{cond}(G) \\leq
+        \\mathtt{GRAM\\_COND\\_LIMIT}`; above it, falls back to a weighted QR
+        orthogonalization on basis evaluations (exact for discrete measures),
+        because the determinant ratios lose all digits once the Gram matrix is
+        ill-conditioned — previously this produced silently wrong fits
+        (e.g., a degree-10 monomial fit over [0, 1] returned O(2e2) where the
+        answer was O(3)).
         """
         num = len(self.base)
+        if self.Gram is None:
+            self.gram_mat()
+        cond_G = np.linalg.cond(self.Gram)
+        if not np.isfinite(cond_G) or cond_G > GRAM_COND_LIMIT:
+            self._form_basis_qr()
+            return
         gram_dets = [1.0] + [det(self.minor_gram(i)) for i in range(num)]
         base = []
         cfs = []
@@ -262,9 +373,13 @@ class Regression(object):
             for p in points:
                 supp[tuple(p[:-1])] = 1.0
             self.meas = Measure(supp)
+            # Exact-match spikes (relative tolerance only): under a discrete measure
+            # supported exactly on the abscissas, <f, b>_mu reduces to sum_j y_j b(x_j),
+            # i.e. ordinary (weighted) least squares. The previous absolute 1e-4 window
+            # merged distinct but close abscissas in normalized units (see _spike_value).
             self.f = lambda x: sum(
                 [
-                    p_[-1] * (1 * (abs(x - array(p_[:-1])) < 1.0e-4)).min()
+                    _spike_value(x, array(p_[:-1]), p_[-1])
                     for p_ in points
                 ]
             )
@@ -383,11 +498,41 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
             self.f_space = FunctionSpace(dim=self.dim, basis=B, measure=self.meas)
             self.regressor.set_func_spc(self.f_space)
         self.apprx = self.regressor.fit()
-        res = array([self.apprx(x) for x in X])
-        self.x_mean = X.mean()
-        self.sum_sqrd_x = sum(power(X, 2))
-        self.training_var = sqrt(sum(power(res.reshape(-1) - y.reshape(-1), 2)) / max(self.training_size - 2, 1))
-        self.t_stat = t.ppf(self.c_limit, self.training_size - 1)
+        # --- exact mean-response confidence-band machinery -------------------------
+        # The model is linear in its parameters (L2(mu) projection onto a basis), so
+        # the variance of the fitted value at x* is  s^2 * b(x*)' M^-1 b(x*), where
+        # M = B' W B is the weighted Gram matrix of the raw basis and s^2 is the
+        # weighted residual mean square with df = n - k. The old closed form
+        # t*s*(1/n + (x-xbar)^2/sqrt(Sxx)) was only valid for one-predictor linear
+        # regression and, as written (missing outer sqrt, sqrt(Sxx) instead of Sxx),
+        # produced bands ~8x too narrow; it is replaced by the exact expression.
+        n = self.training_size
+        k = len(self.f_space.base)
+        self.df = n - k
+        meas_ = self.regressor.meas
+        res_vec = np.array([float(np.ravel(self.apprx(x))[0]) for x in X]).reshape(-1) \
+            - np.asarray(y).reshape(-1)
+        w_all = (np.ones(n, dtype=float) if meas_.continuous
+                 else np.array([meas_.density(tuple(row)) for row in X], dtype=float))
+        self.training_var = float(np.sqrt(
+            float(w_all @ res_vec ** 2) / max(self.df, 1))) \
+            if self.df > 0 else float("nan")
+        self.t_stat = t.ppf(self.c_limit, max(self.df, 1)) \
+            if self.df > 0 and not np.isnan(self.training_var) else 0.0
+        # Backward-compatible attributes (no longer used by predict).
+        if X.shape[1] == 1:
+            self.x_mean = float(X.mean())
+            self.sum_sqrd_x = float(np.sum(power(X, 2)))
+        self.ci_available = bool((not meas_.continuous) and self.df > 0)
+        if self.ci_available:
+            E = np.array([[float(np.ravel(phi(x))[0]) for phi in self.f_space.base] for x in X])
+            self._gram_w = (E.T * w_all) @ E
+            try:
+                np.linalg.solve(self._gram_w, np.eye(k))  # early singularity check
+            except np.linalg.LinAlgError:
+                import warnings
+                warnings.warn("weighted Gram matrix is singular; confidence bands use pinv",
+                              stacklevel=2)
         return self
 
     def predict(self, X):
@@ -396,37 +541,52 @@ class HilbertRegressor(BaseEstimator, RegressorMixin):
 
         :param X: data points for prediction
         :return: returns predicted values
+
+        Side effect: when a valid band is available (discrete measure and
+        ``n >`` number of basis functions), ``self.ci_band`` holds the two-sided
+        mean-response confidence band at level ``c_limit`` for the queried points.
         """
         if len(X.shape) != 2:
             X = X.reshape(X.shape[0], 1)
-        # Adjust the `self.x_mean` according to the weight
-        if X.shape[1] == 1:
-            self.ci_band = (
-                    self.t_stat
-                    * self.training_var
-                    * (
-                            1. / self.training_size
-                            + power(X - self.x_mean, 2)
-                            / sqrt(self.sum_sqrd_x - self.training_size * power(self.x_mean, 2))
-                    )
-            ).reshape(-1)
+        if self.ci_available and X.shape[1] == 1:
+            Bq = np.array([[float(np.ravel(phi(x))[0]) for phi in self.f_space.base] for x in X])
+            try:
+                Mi_bT = np.linalg.solve(self._gram_w, Bq.T)      # M^-1 b_q'   (k x m)
+            except np.linalg.LinAlgError:
+                Mi_bT = np.linalg.pinv(self._gram_w) @ Bq.T
+            var_mean = np.einsum("ij,ji->i", Bq, Mi_bT)          # diag(b M^-1 b')
+            self.ci_band = (self.t_stat * self.training_var
+                            * sqrt(np.clip(var_mean, 0.0, None))).reshape(-1)
         return array([self.apprx(x) for x in X]).reshape(-1)
 
     def score(self, X, y, sample_weight=None):
-        """
-        The default scoring method is the weighted mean square error
+        r"""
+        Coefficient of determination :math:`R^2 = 1 - \mathrm{SS}_{res}/\mathrm{SS}_{tot}`.
 
-        :param X:
-        :param y:
-        :param sample_weight:
-        :return:
+        Follows the scikit-learn convention (higher is better; 1.0 for a perfect fit).
+        The previous version returned the weighted mean square error — use :meth:`mse`
+        for that statistic.
         """
-        num_points = len(X)
-        weights = [self.regressor.meas.density(tuple(x)) for x in X]
-        values = [self.apprx(x) for x in X]
-        sum_w = sum(weights)
-        errors = [weights[_] * (values[_] - y[_]) ** 2 for _ in range(num_points)]
-        try:
-            return sum(errors)[0] / sum_w
-        except IndexError:
-            return sum(errors) / sum_w
+        if len(X.shape) != 2:
+            X = X.reshape(X.shape[0], 1)
+        vals = np.array([self.apprx(x) for x in X]).reshape(-1, 1).ravel()
+        yv = np.asarray(y).reshape(-1)
+        ss_tot = float(np.sum((yv - yv.mean()) ** 2))
+        if ss_tot == 0.0:
+            return 0.0
+        return 1.0 - float(np.sum((yv - vals) ** 2)) / ss_tot
+
+    def mse(self, X, y):
+        r"""
+        Weighted mean square error :math:`\sum_i w_i (y_i - \hat{y}_i)^2 / \sum_i w_i`
+        with the measure weights `w_i` (the pre-0.3 ``score`` semantics).
+
+        Lower is better — do not use it where a scikit-learn-style ``score`` is expected.
+        """
+        if len(X.shape) != 2:
+            X = X.reshape(X.shape[0], 1)
+        weights = np.array([self.regressor.meas.density(tuple(x)) for x in X], dtype=float)
+        vals = np.array([self.apprx(x) for x in X]).reshape(-1, 1).ravel()
+        errs = weights * (vals - np.asarray(y).reshape(-1)) ** 2
+        wsum = float(weights.sum())
+        return float(errs.sum() / wsum) if wsum > 0 else float("nan")

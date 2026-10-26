@@ -36,6 +36,30 @@ The documentation is produced by `Sphinx <http://www.sphinx-doc.org/en/stable/>`
 as well as a bit of theory to explain each method briefly.
 For more details refer to the documentation at `nonlinear-regression.rtfd.io/ <http://nonlinear-regression.rtfd.io/>`_.
 
+Changes in v0.3 (behavior-breaking, read before upgrading)
+=============================
+Bug fixes found by a 2026-10-26 validation pass (`tests/test_fixes_20261026.py`):
+
+- **``HilbertRegressor.score`` now returns $R^2$** (scikit-learn convention: higher is better).
+  The previous weighted mean square error is still available as ``mse``. Code that relied on
+  ``score`` returning an error magnitude must be updated.
+- **Confidence bands are now exact**: the old closed form was only valid for one-predictor
+  linear regression and, as written, produced bands $\sim$8x too narrow with hard-coded
+  degrees of freedom $n-2$. Bands are now
+  $t_{1-\alpha/2,\,n-k}\,s\,\sqrt{b(x)^\top(B^\top W B)^{-1}b(x)}$ with the true basis size $k$;
+  they are only produced when a discrete measure is used and $n > k$.
+- **Ill-conditioned bases no longer corrupt fits**: above a Gram condition threshold
+  (``GRAM_COND_LIMIT = 1e10``, e.g. monomial degrees $\gtrsim 7$ on $[0,1]$) the orthogonal basis
+  is now built by weighted QR of basis evaluations instead of determinant ratios — previously
+  such fits silently returned values off by orders of magnitude (or NaN). A linearly dependent
+  basis raises ``Error`` instead.
+- **Near-colliding abscissas are no longer merged**: the data-function spike kernel used an
+  absolute window of $10^{-4}$ in normalized units, which collapsed distinct observations closer
+  than that (e.g. hourly timestamps over a multi-year span). Matching is now exact up to float
+  round-off only.
+- **``Time2Interval`` preserves sub-day resolution** (previously ``.days`` truncated intraday
+  timestamps onto whole days) and raises ``ValueError`` for an empty time span.
+
 License
 =============================
 This code is distributed under `MIT license <https://en.wikipedia.org/wiki/MIT_License>`_:

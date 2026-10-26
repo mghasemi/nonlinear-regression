@@ -101,7 +101,12 @@ class Time2Interval(object):
         self.max_date = max_date
         self.lower = lower
         self.upper = upper
-        t_length = (max_date - min_date).days
+        # total_seconds()/86400 keeps sub-day (e.g., hourly) resolution; the old
+        # `.days` attribute truncated to whole days, collapsing all intraday
+        # timestamps of a day onto the same abscissa.
+        t_length = (max_date - min_date).total_seconds() / 86400.0
+        if t_length <= 0:
+            raise ValueError("`min_date` must be strictly earlier than `max_date`.")
         n_length = upper - lower
         self.trans_coef = n_length / t_length
         self.intercept = lower
@@ -110,11 +115,11 @@ class Time2Interval(object):
         """
         Transforms a datetime object into a real number according to the initial parameters
         :param calendar_date: a datetime object to be converted into real number
-        :return: the transformed number
+        :return: the transformed number (sub-day resolution preserved)
         """
         if type(calendar_date) not in [datetime, date, Timestamp]:
             raise TypeError("`calendar_date` must be `datetime` object")
-        corresponding_x_number = (calendar_date - self.min_date).days
+        corresponding_x_number = (calendar_date - self.min_date).total_seconds() / 86400.0
         corresponding_y_number = self.trans_coef * corresponding_x_number + self.intercept
         return corresponding_y_number
 
